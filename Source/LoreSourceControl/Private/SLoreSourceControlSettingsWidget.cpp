@@ -3,6 +3,10 @@
 #include "LoreSourceControlProvider.h"
 #include "LorePathUtils.h"
 #include "Misc/Paths.h"
+#include "DesktopPlatformModule.h"
+#include "IDesktopPlatform.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Styling/AppStyle.h"
 
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -49,11 +53,37 @@ void SLoreSourceControlSettings::Construct(const FArguments& InArgs)
 		[
 			MakeLabeledRow(
 				LOCTEXT("RepositoryRootLabel", "Repository folder"),
-				SNew(SEditableTextBox)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.0f)
+				[
+					SNew(SEditableTextBox)
 					.Text(this, &SLoreSourceControlSettings::GetRepositoryRootText)
-					.HintText(LOCTEXT("RepositoryRootHint", "Automatic (project folder and four parents)"))
-					.OnTextCommitted(this, &SLoreSourceControlSettings::OnRepositoryRootCommitted),
-				LOCTEXT("RepositoryRootTooltip", "Optional absolute path to the folder containing .lore. The project must be inside it. Saved locally for this project. Clear to use automatic discovery, then reconnect."))
+					.HintText(LOCTEXT("RepositoryRootHint", "Automatic"))
+					.OnTextCommitted(this, &SLoreSourceControlSettings::OnRepositoryRootCommitted)
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(6.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SButton)
+					.Text(LOCTEXT("BrowseRepository", "Browse..."))
+					.ToolTipText(LOCTEXT("BrowseRepositoryTooltip", "Choose the folder containing .lore. Selecting .lore itself also works; its parent folder will be used."))
+					.OnClicked(this, &SLoreSourceControlSettings::OnBrowseRepositoryClicked)
+				],
+				LOCTEXT("RepositoryRootTooltip", "The local folder containing .lore, not a .uproject file or server URL. Saved only for this project. Clear the field to restore automatic discovery, then reconnect."))
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("RepositoryRootHelp", "Leave empty to find .lore in this project's folder or up to four folders above it. To use another location, enter or browse to the folder containing .lore. The project must be inside it. Reconnect to apply."))
+			.Font(FAppStyle::GetFontStyle("SmallFont"))
+			.AutoWrapText(true)
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
+		[
+			SNew(STextBlock)
+			.Text_Lambda([this]() { return RepositoryBrowseError; })
+			.Visibility_Lambda([this]() { return RepositoryBrowseError.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible; })
+			.ColorAndOpacity(FLinearColor(1.0f, 0.3f, 0.2f))
+			.AutoWrapText(true)
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
 		[
@@ -118,9 +148,53 @@ FText SLoreSourceControlSettings::GetRepositoryRootText() const
 
 void SLoreSourceControlSettings::OnRepositoryRootCommitted(const FText& InText, ETextCommit::Type InCommitType)
 {
+	RepositoryBrowseError = FText::GetEmpty();
 	FLoreSourceControlModule& Module = FLoreSourceControlModule::Get();
 	Module.AccessSettings().SetRepositoryRoot(InText.ToString().TrimStartAndEnd());
 	Module.SaveSettings();
+}
+
+FReply SLoreSourceControlSettings::OnBrowseRepositoryClicked()
+{
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (!DesktopPlatform)
+	{
+		RepositoryBrowseError = LOCTEXT("RepositoryBrowserUnavailable", "Folder browsing is unavailable. Enter the repository folder path manually.");
+		return FReply::Handled();
+	}
+
+	FLoreSourceControlModule& Module = FLoreSourceControlModule::Get();
+	FText Error;
+	FString InitialFolder = FLorePathUtils::ResolveRepositoryRoot(
+		FPaths::ProjectDir(), Module.AccessSettings().GetRepositoryRoot(), Error);
+	if (InitialFolder.IsEmpty())
+	{
+		InitialFolder = FLorePathUtils::NormalizeAbsolutePath(FPaths::ProjectDir());
+	}
+
+	FString SelectedFolder;
+	const void* ParentWindow = FSlateApplication::Get().FindBestParentWindowHandleForDialogs(AsShared());
+	if (!DesktopPlatform->OpenDirectoryDialog(ParentWindow,
+		LOCTEXT("ChooseRepositoryFolder", "Choose the repository folder containing .lore").ToString(),
+		InitialFolder, SelectedFolder))
+	{
+		return FReply::Handled(); // Cancel leaves the existing setting untouched.
+	}
+
+	FPaths::NormalizeDirectoryName(SelectedFolder);
+	if (FPaths::GetCleanFilename(SelectedFolder).Equals(TEXT(".lore"), ESearchCase::IgnoreCase))
+	{
+		SelectedFolder = FPaths::GetPath(SelectedFolder);
+	}
+	const FString Root = FLorePathUtils::ResolveRepositoryRoot(FPaths::ProjectDir(), SelectedFolder, Error);
+	if (Root.IsEmpty())
+	{
+		RepositoryBrowseError = Error; // Keep the previous setting on invalid selection.
+		return FReply::Handled();
+	}
+
+	OnRepositoryRootCommitted(FText::FromString(Root), ETextCommit::Default);
+	return FReply::Handled();
 }
 
 FText SLoreSourceControlSettings::GetDetectedRepositoryText() const

@@ -71,8 +71,12 @@ parent folders** for a `.lore` directory. The nearest match wins. For example,
 `MyRepo/MyGame/MyGame.uproject` automatically uses `MyRepo` when
 `MyRepo/.lore` exists. The settings panel displays the resolved repository folder.
 
-For deeper layouts, enter an absolute path to the folder **containing** `.lore`.
-Select the parent of `.lore`, not `.lore` itself, a `.uproject` file, or
+For deeper layouts, enter an absolute path or click **Browse...** to choose the
+folder **containing** `.lore`. The native picker selects folders, not files:
+`.lore` is a metadata directory, not a file extension. If you select `.lore`
+itself, Browse uses its parent. Invalid selections display an inline error and
+leave the previous setting unchanged; Cancel also leaves it unchanged.
+When typing a path, use the parent of `.lore`, not `.lore` itself, a `.uproject` file, or
 a remote URL. The selected folder must contain the Unreal project. Invalid overrides show an
 error and do not fall back to automatic discovery. Click **Reconnect** after
 changing the field; wait for any current Lore operation to finish first.

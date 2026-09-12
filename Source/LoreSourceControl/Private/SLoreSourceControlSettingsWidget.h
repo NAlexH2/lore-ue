@@ -16,6 +16,8 @@ public:
 	void Construct(const FArguments& InArgs);
 
 private:
+	FText RepositoryBrowseError;
+	FReply OnBrowseRepositoryClicked();
 	FText GetRepositoryRootText() const;
 	void OnRepositoryRootCommitted(const FText& InText, ETextCommit::Type InCommitType);
 	FText GetDetectedRepositoryText() const;

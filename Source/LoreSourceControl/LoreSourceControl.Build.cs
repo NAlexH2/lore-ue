@@ -20,7 +20,8 @@ public class LoreSourceControl : ModuleRules
 			"SlateCore",
 			"InputCore",
 			"Projects",
-			"UnrealEd"
+			"UnrealEd",
+			"DesktopPlatform"
 		});
 
 		// The Lore provider drives the public `lore` CLI as a child process,
