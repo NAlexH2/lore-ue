@@ -9,6 +9,8 @@
 #include "Styling/AppStyle.h"
 
 #include "Widgets/Text/STextBlock.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/SToolTip.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBox.h"
@@ -61,6 +63,18 @@ void SLoreSourceControlSettings::Construct(const FArguments& InArgs)
 					.HintText(LOCTEXT("RepositoryRootHint", "Automatic"))
 					.OnTextCommitted(this, &SLoreSourceControlSettings::OnRepositoryRootCommitted)
 				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f)
+				[
+					SNew(SImage)
+					.Image(FAppStyle::GetBrush("Icons.Help"))
+					.ToolTip(
+						SNew(SToolTip)
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("RepositoryRootHelp", "Automatic: searches this project's folder and up to four folders above it for .lore.\n\nTo choose a location, type a path or use Browse. Select the folder containing .lore and this project; Browse also accepts .lore itself.\n\nClear the field to restore automatic discovery. Reconnect to apply."))
+							.WrapTextAt(360.0f)
+						])
+				]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(6.0f, 0.0f, 0.0f, 0.0f)
 				[
 					SNew(SButton)
@@ -69,13 +83,6 @@ void SLoreSourceControlSettings::Construct(const FArguments& InArgs)
 					.OnClicked(this, &SLoreSourceControlSettings::OnBrowseRepositoryClicked)
 				],
 				LOCTEXT("RepositoryRootTooltip", "The local folder containing .lore, not a .uproject file or server URL. Saved only for this project. Clear the field to restore automatic discovery, then reconnect."))
-		]
-		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
-		[
-			SNew(STextBlock)
-			.Text(LOCTEXT("RepositoryRootHelp", "Leave empty to find .lore in this project's folder or up to four folders above it. To use another location, enter or browse to the folder containing .lore. The project must be inside it. Reconnect to apply."))
-			.Font(FAppStyle::GetFontStyle("SmallFont"))
-			.AutoWrapText(true)
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
 		[

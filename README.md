@@ -66,6 +66,8 @@ After changing the setting, reconnect. If you changed `PATH`, restart Unreal
 
 #### Repository folder (working-copy root)
 
+Hover the **?** icon beside the field for setup instructions.
+
 Leave **Repository folder** empty to search the project folder and up to **four
 parent folders** for a `.lore` directory. The nearest match wins. For example,
 `MyRepo/MyGame/MyGame.uproject` automatically uses `MyRepo` when
