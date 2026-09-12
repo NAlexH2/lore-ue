@@ -203,7 +203,11 @@ bool FLoreSourceControlState::CanCheckout() const
 
 bool FLoreSourceControlState::IsCheckedOut() const
 {
-	return LockState == ELoreLockState::LockedByMe;
+	// Unreal's submit dialog drops existing files that are not checked out,
+	// even when CanCheckIn() is true. Lore permits edits without a lock, so
+	// expose those pending edits as checked out locally, not as a remote lock.
+	return LockState == ELoreLockState::LockedByMe
+		|| (LockState != ELoreLockState::LockedByOther && CanCheckIn() && IsModified());
 }
 
 bool FLoreSourceControlState::IsCheckedOutOther(FString* Who) const

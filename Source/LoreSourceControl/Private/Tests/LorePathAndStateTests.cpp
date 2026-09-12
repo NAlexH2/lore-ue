@@ -7,6 +7,52 @@
 #include "LoreTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "Misc/ScopeExit.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLoreRepositoryRootTest,
+	"Lore.SourceControl.PathUtils.RepositoryRoot",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLoreRepositoryRootTest::RunTest(const FString& Parameters)
+{
+	const FString Base = FLorePathUtils::NormalizeAbsolutePath(FPaths::Combine(
+		FPaths::ProjectSavedDir(), TEXT("LoreRootTests"), FGuid::NewGuid().ToString()));
+	IFileManager& Files = IFileManager::Get();
+	ON_SCOPE_EXIT { Files.DeleteDirectory(*Base, false, true); };
+	const FString Root = FPaths::Combine(Base, TEXT("Repo"));
+	const FString Deep = FPaths::Combine(Root, TEXT("One/Two/Three/Four/Five"));
+	TestTrue(TEXT("Create fixture"), Files.MakeDirectory(*Deep, true));
+	TestTrue(TEXT("Create metadata"), Files.MakeDirectory(*FPaths::Combine(Root, TEXT(".lore")), true));
+	FText Error;
+	auto Resolve = [&Error](const FString& Project, const FString& Override = FString())
+	{
+		return FLorePathUtils::MakeCacheKey(FLorePathUtils::ResolveRepositoryRoot(Project, Override, Error));
+	};
+	const FString RootKey = FLorePathUtils::MakeCacheKey(Root);
+	TestEqual(TEXT("Project is repository root"), Resolve(Root), RootKey);
+	TestEqual(TEXT("One parent"), Resolve(FPaths::Combine(Root, TEXT("One"))), RootKey);
+	TestEqual(TEXT("Fourth parent included"), Resolve(FPaths::GetPath(Deep)), RootKey);
+	TestTrue(TEXT("Fifth parent excluded"), Resolve(Deep).IsEmpty());
+	TestFalse(TEXT("Missing repository explains selection"), Error.IsEmpty());
+	TestEqual(TEXT("Explicit root bypasses limit"), Resolve(Deep, Root), RootKey);
+	TestTrue(TEXT("Success clears previous error"), Error.IsEmpty());
+	TestEqual(TEXT("Normalize parent traversal"), Resolve(Deep, FPaths::Combine(Root, TEXT("One/.."))), RootKey);
+	TestTrue(TEXT("Metadata directory itself rejected"), Resolve(Deep, FPaths::Combine(Root, TEXT(".lore"))).IsEmpty());
+	TestTrue(TEXT("Invalid override does not fall back"), Resolve(Root, Base).IsEmpty());
+	TestTrue(TEXT("Relative override rejected"), Resolve(Root, TEXT("Repo")).IsEmpty());
+	TestTrue(TEXT("Sibling sharing prefix rejected"), Resolve(Root + TEXT("Other"), Root).IsEmpty());
+	TestTrue(TEXT("Project above selected repository rejected"), Resolve(Base, Root).IsEmpty());
+	const FString Nested = FPaths::Combine(Root, TEXT("One/Two"));
+	TestTrue(TEXT("Create nested metadata"), Files.MakeDirectory(*FPaths::Combine(Nested, TEXT(".lore")), true));
+	TestEqual(TEXT("Nearest nested repository wins"), Resolve(Deep), FLorePathUtils::MakeCacheKey(Nested));
+	TestEqual(TEXT("Override wins over automatic discovery"), Resolve(Deep, Root), RootKey);
+	const FString Asset = FPaths::Combine(Root, TEXT("One/Content/Asset.uasset"));
+	TestEqual(TEXT("Nested project file uses repository-relative path"),
+		FLorePathUtils::ToWorkspaceRelativePath(Asset, Root), FString(TEXT("One/Content/Asset.uasset")));
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FLorePathUtilsTest,
@@ -173,6 +219,24 @@ bool FLoreStateTransitionTest::RunTest(const FString& Parameters)
 	const FString File = FLorePathUtils::NormalizeAbsolutePath(FPaths::Combine(FPaths::ProjectContentDir(), TEXT("LoreStateMapping.uasset")));
 
 	// Modified + locked by me + at head -> checked out and submittable.
+	// Unreal filters submitted existing files using IsCheckedOut after refreshing
+	// status. An unlocked edit must survive that filter without claiming a lock.
+	{
+		FLoreSourceControlState State(File);
+		State.WorkingState = ELoreWorkingState::Modified;
+		TestTrue(TEXT("Unlocked modified file can check in"), State.CanCheckIn());
+		TestTrue(TEXT("Unlocked edit survives Unreal submit filter"),
+			State.IsCheckedOut() || State.IsAdded() || State.IsDeleted());
+		TestTrue(TEXT("Unlocked edit is not reverted as unchanged"), State.IsModified());
+		TestTrue(TEXT("Explicit lock acquisition remains available"), State.CanCheckout());
+		State.WorkingState = ELoreWorkingState::Clean;
+		TestFalse(TEXT("Clean unlocked file is not checked out"), State.IsCheckedOut());
+		State.WorkingState = ELoreWorkingState::Modified;
+		State.LockState = ELoreLockState::LockedByOther;
+		TestFalse(TEXT("Foreign lock is not our checkout"), State.IsCheckedOut());
+		TestFalse(TEXT("Foreign lock still blocks submit"), State.CanCheckIn());
+	}
+
 	{
 		FLoreSourceControlState State(File);
 		State.WorkingState = ELoreWorkingState::Modified;

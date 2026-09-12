@@ -70,8 +70,9 @@ public:
 	/** Resolved path to the `lore` executable. */
 	const FString& GetLoreBinaryPath() const { return LoreBinaryPath; }
 
-	/** Root of the working copy (project directory). */
+	/** Validated repository root, which may be an ancestor of the project. */
 	const FString& GetWorkingCopyRoot() const { return WorkingCopyRoot; }
+	const FText& GetRepositoryRootError() const { return RepositoryRootError; }
 	void SetWorkingCopyRoot(const FString& InRoot) { WorkingCopyRoot = InRoot; }
 
 	/** Identity used for status/locks. */
@@ -115,6 +116,7 @@ private:
 
 private:
 	FString WorkingCopyRoot;
+	FText RepositoryRootError;
 	FString LoreBinaryPath;
 	FString UserName;
 

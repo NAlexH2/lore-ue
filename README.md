@@ -40,7 +40,47 @@ build or link.
 3. Launch the editor, open **Revision Control > Change Source Control Settings**,
    and choose **Lore** as the provider.
 
-If `lore` is not on your `PATH`, set the executable path in the Lore settings panel.
+### Automatic path detection
+
+The plugin tries to locate **two separate things**: the Lore CLI executable and
+the Lore working-copy root. These can be in different folders; you do not need to
+install the CLI beside the Unreal project.
+
+#### Lore executable (file)
+
+The plugin checks, in order:
+
+1. The **lore executable** setting, if it names an existing file.
+2. `lore.exe` (Windows) or `lore` (other platforms) on the editor process's `PATH`.
+3. A binary, if supplied, at
+   `<Plugin>/Binaries/ThirdParty/Lore/<Platform>/lore.exe` (or `lore`), where
+   `<Platform>` is Unreal's binaries subdirectory, such as `Win64`.
+
+Leave the field empty to use discovery, or enter the **full executable filename**,
+not its containing folder. An override that does not exist falls through to the
+other locations. Discovery does not scan arbitrary drives or download Lore.
+The settings panel displays the resolved executable; initial automatic detection
+also populates the setting. Clear an old value to discover a new location.
+After changing the setting, reconnect. If you changed `PATH`, restart Unreal
+(and its launcher if necessary) so the editor inherits the new environment.
+
+#### Repository folder (working-copy root)
+
+Leave **Repository folder** empty to search the project folder and up to **four
+parent folders** for a `.lore` directory. The nearest match wins. For example,
+`MyRepo/MyGame/MyGame.uproject` automatically uses `MyRepo` when
+`MyRepo/.lore` exists. The settings panel displays the resolved repository folder.
+
+For deeper layouts, enter an absolute path to the folder **containing** `.lore`.
+Select the parent of `.lore`, not `.lore` itself, a `.uproject` file, or
+a remote URL. The selected folder must contain the Unreal project. Invalid overrides show an
+error and do not fall back to automatic discovery. Click **Reconnect** after
+changing the field; wait for any current Lore operation to finish first.
+
+The override is stored only in this project's
+`Saved/Config/LoreRepositorySettings.ini`, even when Unreal uses global source
+control settings. Clear it to restore automatic discovery. Lore command paths
+are relative to the repository root, including the project's subdirectory.
 
 ![Revision Control Settings panel showing Lore selected as the provider](Media/revision-control-settings.png)
 
@@ -56,6 +96,29 @@ If `lore` is not on your `PATH`, set the executable path in the Lore settings pa
   accidental submission.
 - **Fail-closed submits** — check-in re-verifies lock ownership and head state before
   it mutates anything.
+
+## Checking for updates vs. syncing
+
+With Lore CLI `0.9.0+783`, there is no separate `lore fetch` command. To inspect
+remote revisions without updating your working files, run from the working copy:
+
+```sh
+lore --remote history 10
+```
+
+To check local edits and then update the working copy:
+
+```sh
+lore status --scan
+lore sync
+```
+
+The editor's **Sync** operation runs `lore sync`: it updates the working copy,
+not just remote metadata, and currently operates on the repository as a whole
+even when invoked from selected assets. Save editor changes first and review
+local edits before syncing. Do not use `sync --reset` to merely check for updates;
+that option resets locally modified files to match the incoming revision.
+**Check in** stages and commits selected files, then runs `lore push`.
 
 ## Identity vs. authentication
 

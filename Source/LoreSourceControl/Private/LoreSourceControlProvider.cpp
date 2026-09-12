@@ -32,9 +32,15 @@ static FName ProviderName("Lore");
 
 void FLoreSourceControlProvider::Init(bool bForceConnection)
 {
+	// Let outstanding commands finish with their original repository and cache.
+	if (!CommandQueue.IsEmpty())
+	{
+		FMessageLog("SourceControl").Warning(LOCTEXT("ReconnectBusy", "Wait for the current Lore operation to finish, then reconnect."));
+		return;
+	}
 	RefreshConnectionSettings();
 
-	if (LoreBinaryPath.IsEmpty())
+	if (LoreBinaryPath.IsEmpty() || WorkingCopyRoot.IsEmpty())
 	{
 		ConnectionState = ELoreConnectionState::Error;
 		return;
@@ -88,9 +94,12 @@ void FLoreSourceControlProvider::RefreshConnectionSettings()
 
 	UserName = Settings.GetUserName();
 
-	if (WorkingCopyRoot.IsEmpty())
+	const FString ResolvedRoot = FLorePathUtils::ResolveRepositoryRoot(FPaths::ProjectDir(), Settings.GetRepositoryRoot(), RepositoryRootError);
+	if (ResolvedRoot != WorkingCopyRoot)
 	{
-		WorkingCopyRoot = FLorePathUtils::NormalizeAbsolutePath(FPaths::ProjectDir());
+		StateCache.Empty();
+		PackagesToRefresh.Empty();
+		WorkingCopyRoot = ResolvedRoot;
 	}
 }
 
@@ -236,6 +245,13 @@ void FLoreSourceControlProvider::UnregisterSourceControlStateChanged_Handle(FDel
 
 ECommandResult::Type FLoreSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
 {
+	if (WorkingCopyRoot.IsEmpty())
+	{
+		InOperation->AddErrorMessge(RepositoryRootError);
+		FMessageLog("SourceControl").Error(RepositoryRootError);
+		InOperationCompleteDelegate.ExecuteIfBound(InOperation, ECommandResult::Failed);
+		return ECommandResult::Failed;
+	}
 	if (!IsEnabled())
 	{
 		InOperationCompleteDelegate.ExecuteIfBound(InOperation, ECommandResult::Failed);

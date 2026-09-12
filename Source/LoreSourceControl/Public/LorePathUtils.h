@@ -6,6 +6,8 @@
 class FLorePathUtils
 {
 public:
+	/** Project directory plus at most four parents; an explicit absolute root bypasses the depth limit. */
+	static FString ResolveRepositoryRoot(const FString& ProjectDirectory, const FString& Override, FText& OutError);
 	static FString NormalizeAbsolutePath(const FString& InPath);
 	static FString NormalizeSourceControlPath(const FString& InPath, const FString& WorkspaceRoot);
 	static FString ResolveSourceControlPath(const FString& InPath, const FString& WorkspaceRoot);

@@ -2,6 +2,50 @@
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 
+FString FLorePathUtils::ResolveRepositoryRoot(const FString& ProjectDirectory, const FString& Override, FText& OutError)
+{
+	OutError = FText::GetEmpty();
+	const FString Project = NormalizeAbsolutePath(ProjectDirectory);
+	const FString Selected = Override.TrimStartAndEnd();
+	if (!Selected.IsEmpty())
+	{
+		if (FPaths::IsRelative(Selected))
+		{
+			OutError = NSLOCTEXT("LoreSourceControl", "RelativeRepository", "Repository folder must be an absolute path to the folder containing .lore.");
+			return FString();
+		}
+		const FString Root = NormalizeAbsolutePath(Selected);
+		if (!FPaths::DirectoryExists(FPaths::Combine(Root, TEXT(".lore"))))
+		{
+			OutError = NSLOCTEXT("LoreSourceControl", "MissingMetadata", "Repository folder must contain a .lore directory. Select its parent folder, not .lore itself.");
+			return FString();
+		}
+		if (Project.IsEmpty() || !IsUnderWorkspace(Project, Root))
+		{
+			OutError = NSLOCTEXT("LoreSourceControl", "ProjectOutsideRepository", "The Unreal project must be inside the selected repository folder.");
+			return FString();
+		}
+		return Root;
+	}
+
+	FString Candidate = Project;
+	for (int32 Depth = 0; Depth <= 4 && !Candidate.IsEmpty(); ++Depth)
+	{
+		if (FPaths::DirectoryExists(FPaths::Combine(Candidate, TEXT(".lore"))))
+		{
+			return Candidate;
+		}
+		const FString Parent = NormalizeAbsolutePath(FPaths::Combine(Candidate, TEXT("..")));
+		if (Parent == Candidate)
+		{
+			break;
+		}
+		Candidate = Parent;
+	}
+	OutError = NSLOCTEXT("LoreSourceControl", "RepositoryNotFound", "No .lore directory found in the project folder or its four parents. Enter the repository folder below.");
+	return FString();
+}
+
 namespace LorePathUtilsPrivate
 {
 bool LooksLikeEngineBinariesMisresolve(const FString& AbsolutePath)

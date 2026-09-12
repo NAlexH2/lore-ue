@@ -12,6 +12,9 @@
 class FLoreSourceControlSettings
 {
 public:
+	/** Absolute repository folder override; always saved locally per project. */
+	FString GetRepositoryRoot() const;
+	void SetRepositoryRoot(const FString& InString);
 	/** Path to the `lore` executable (empty = auto-detect on PATH/bundled). */
 	FString GetBinaryPath() const;
 	void SetBinaryPath(const FString& InString);
@@ -36,6 +39,7 @@ private:
 	mutable FCriticalSection CriticalSection;
 
 	FString BinaryPath;
+	FString RepositoryRoot;
 	FString RepositoryUrl;
 	FString UserName;
 

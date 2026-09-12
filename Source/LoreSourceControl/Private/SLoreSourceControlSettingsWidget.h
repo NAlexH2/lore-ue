@@ -16,6 +16,9 @@ public:
 	void Construct(const FArguments& InArgs);
 
 private:
+	FText GetRepositoryRootText() const;
+	void OnRepositoryRootCommitted(const FText& InText, ETextCommit::Type InCommitType);
+	FText GetDetectedRepositoryText() const;
 	// Binary path.
 	FText GetBinaryPathText() const;
 	void OnBinaryPathCommitted(const FText& InText, ETextCommit::Type InCommitType);

@@ -1,6 +1,8 @@
 #include "SLoreSourceControlSettingsWidget.h"
 #include "LoreSourceControlModule.h"
 #include "LoreSourceControlProvider.h"
+#include "LorePathUtils.h"
+#include "Misc/Paths.h"
 
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -43,6 +45,22 @@ void SLoreSourceControlSettings::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
+		[
+			MakeLabeledRow(
+				LOCTEXT("RepositoryRootLabel", "Repository folder"),
+				SNew(SEditableTextBox)
+					.Text(this, &SLoreSourceControlSettings::GetRepositoryRootText)
+					.HintText(LOCTEXT("RepositoryRootHint", "Automatic (project folder and four parents)"))
+					.OnTextCommitted(this, &SLoreSourceControlSettings::OnRepositoryRootCommitted),
+				LOCTEXT("RepositoryRootTooltip", "Optional absolute path to the folder containing .lore. The project must be inside it. Saved locally for this project. Clear to use automatic discovery, then reconnect."))
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
+		[
+			SNew(STextBlock)
+			.Text(this, &SLoreSourceControlSettings::GetDetectedRepositoryText)
+			.AutoWrapText(true)
+		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
 		[
 			MakeLabeledRow(
@@ -91,6 +109,26 @@ void SLoreSourceControlSettings::Construct(const FArguments& InArgs)
 FText SLoreSourceControlSettings::GetBinaryPathText() const
 {
 	return FText::FromString(FLoreSourceControlModule::Get().AccessSettings().GetBinaryPath());
+}
+
+FText SLoreSourceControlSettings::GetRepositoryRootText() const
+{
+	return FText::FromString(FLoreSourceControlModule::Get().AccessSettings().GetRepositoryRoot());
+}
+
+void SLoreSourceControlSettings::OnRepositoryRootCommitted(const FText& InText, ETextCommit::Type InCommitType)
+{
+	FLoreSourceControlModule& Module = FLoreSourceControlModule::Get();
+	Module.AccessSettings().SetRepositoryRoot(InText.ToString().TrimStartAndEnd());
+	Module.SaveSettings();
+}
+
+FText SLoreSourceControlSettings::GetDetectedRepositoryText() const
+{
+	FText Error;
+	const FString Root = FLorePathUtils::ResolveRepositoryRoot(FPaths::ProjectDir(),
+		FLoreSourceControlModule::Get().AccessSettings().GetRepositoryRoot(), Error);
+	return Root.IsEmpty() ? Error : FText::Format(LOCTEXT("DetectedRepository", "Repository: {0}"), FText::FromString(Root));
 }
 
 void SLoreSourceControlSettings::OnBinaryPathCommitted(const FText& InText, ETextCommit::Type InCommitType)

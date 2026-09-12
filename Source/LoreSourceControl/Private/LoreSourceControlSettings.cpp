@@ -1,9 +1,26 @@
 #include "LoreSourceControlSettings.h"
 #include "SourceControlHelpers.h"
+#include "Misc/Paths.h"
 
 namespace
 {
 	const TCHAR* SettingsSection = TEXT("LoreSourceControl.LoreSourceControlSettings");
+	FString GetLocalRepositoryIni()
+	{
+		return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Config/LoreRepositorySettings.ini"));
+	}
+}
+
+FString FLoreSourceControlSettings::GetRepositoryRoot() const
+{
+	FScopeLock ScopeLock(&CriticalSection);
+	return RepositoryRoot;
+}
+
+void FLoreSourceControlSettings::SetRepositoryRoot(const FString& InString)
+{
+	FScopeLock ScopeLock(&CriticalSection);
+	RepositoryRoot = InString;
 }
 
 FString FLoreSourceControlSettings::GetBinaryPath() const
@@ -57,6 +74,8 @@ void FLoreSourceControlSettings::SetEphemeralPassword(const FString& InString)
 void FLoreSourceControlSettings::LoadSettings()
 {
 	FScopeLock ScopeLock(&CriticalSection);
+	RepositoryRoot.Empty();
+	GConfig->GetString(SettingsSection, TEXT("RepositoryRoot"), RepositoryRoot, GetLocalRepositoryIni());
 	const FString& IniFile = SourceControlHelpers::GetSettingsIni();
 	GConfig->GetString(SettingsSection, TEXT("BinaryPath"), BinaryPath, IniFile);
 	GConfig->GetString(SettingsSection, TEXT("RepositoryUrl"), RepositoryUrl, IniFile);
@@ -66,6 +85,9 @@ void FLoreSourceControlSettings::LoadSettings()
 void FLoreSourceControlSettings::SaveSettings() const
 {
 	FScopeLock ScopeLock(&CriticalSection);
+	const FString LocalIni = GetLocalRepositoryIni();
+	GConfig->SetString(SettingsSection, TEXT("RepositoryRoot"), *RepositoryRoot, LocalIni);
+	GConfig->Flush(false, LocalIni);
 	const FString& IniFile = SourceControlHelpers::GetSettingsIni();
 	GConfig->SetString(SettingsSection, TEXT("BinaryPath"), *BinaryPath, IniFile);
 	GConfig->SetString(SettingsSection, TEXT("RepositoryUrl"), *RepositoryUrl, IniFile);
